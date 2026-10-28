@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>クレーンでひらがなをつかもう！</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Kosugi+Maru&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Kosugi Maru', sans-serif;
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* アーケード筐体風フレーム */
+        .arcade-frame {
+            border: 8px solid #ff758c;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15), inset 0 0 15px rgba(255,255,255,0.6);
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(5px);
+        }
+
+        /* クレーンのケーブルとアーム */
+        .crane-cable {
+            width: 4px;
+            background-color: #475569;
+            transition: height 0.05s linear;
+        }
+
+        .crane-claw {
+            transition: transform 0.2s ease-in-out;
+        }
+
+        .claw-open .claw-left {
+            transform: rotate(-30deg);
+        }
+        .claw-open .claw-right {
+            transform: rotate(30deg);
+        }
+        .claw-closed .claw-left {
+            transform: rotate(10deg);
+        }
+        .claw-closed .claw-right {
+            transform: rotate(-10deg);
+        }
+
+        /* 文字カード */
+        .char-card {
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1), inset 0 2px 0 rgba(255,255,255,0.8);
+            transition: all 0.2s ease;
+        }
+        .char-card:hover {
+            transform: translateY(-2deg);
+        }
+
+        /* アニメーション */
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6deg); }
+        }
+        .animate-float {
+            animation: float 2.5s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-2 sm:p-4 text-gray-800">
+
+    <!-- ヘッダーエリア -->
+    <header class="w-full max-w-xl flex justify-between items-center mb-2 px-2 flex-wrap gap-2">
+        <div class="flex items-center space-x-1">
+            <span class="text-2xl sm:text-3xl">🏗️</span>
+            <span class="font-black text-pink-600 text-sm sm:text-base">クレーンパズル</span>
+        </div>
+        
+        <!-- モード切替タブ（カテゴリ選択） -->
+        <div class="flex items-center bg-pink-200 p-1 rounded-2xl border border-pink-300 shadow-inner flex-wrap gap-1">
+            <button id="mode-hiragana" class="px-2 sm:px-3 py-1 rounded-xl text-xs font-bold transition-all bg-pink-500 text-white shadow">
+                絵(ひらがな)
+            </button>
+            <button id="mode-katakana" class="px-2 sm:px-3 py-1 rounded-xl text-xs font-bold transition-all text-pink-700 hover:text-pink-900">
+                絵(カタカナ)
+            </button>
+            <button id="mode-english" class="px-2 sm:px-3 py-1 rounded-xl text-xs font-bold transition-all text-pink-700 hover:text-pink-900">
+                絵(えいご)
+            </button>
+            <button id="mode-shape" class="px-2 sm:px-3 py-1 rounded-xl text-xs font-bold transition-all text-pink-700 hover:text-pink-900">
+                🔷 かたち
+            </button>
+            <button id="mode-math" class="px-2 sm:px-3 py-1 rounded-xl text-xs font-bold transition-all text-pink-700 hover:text-pink-900">
+                ➕ さんすう
+            </button>
+            <button id="mode-kanji-read" class="px-2 sm:px-3 py-1 rounded-xl text-xs font-bold transition-all text-pink-700 hover:text-pink-900">
+                📖 漢字の読み
+            </button>
+            <button id="mode-kanji-write" class="px-2 sm:px-3 py-1 rounded-xl text-xs font-bold transition-all text-pink-700 hover:text-pink-900">
+                ✍️ 漢字えらび
+            </button>
+        </div>
+
+        <div class="bg-white px-3 py-1 rounded-full shadow border-2 border-pink-300 flex items-center space-x-2">
+            <span class="text-xs sm:text-sm font-bold text-gray-500">スコア:</span>
+            <span id="score-display" class="text-lg font-black text-pink-500">0</span>
+        </div>
+    </header>
+
+    <!-- 主ゲームエリア -->
+    <main class="w-full max-w-xl arcade-frame rounded-3xl p-3 sm:p-5 flex flex-col items-center relative overflow-hidden flex-1 justify-between">
+
+        <!-- 問題表示エリア（イラスト・問題カードと枠） -->
+        <div class="w-full bg-white/80 rounded-2xl p-3 border-2 border-pink-200 shadow-inner flex flex-col items-center">
+            <!-- お題（イラストまたはテキストカード） -->
+            <div id="question-card" class="w-28 h-28 sm:w-32 sm:h-32 flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 rounded-xl border-2 border-amber-200 shadow-sm relative mb-2 animate-float p-2">
+                <div id="image-container" class="w-full h-full flex items-center justify-center">
+                    <!-- SVGイラストまたはテキストがJSで動的に挿入されます -->
+                </div>
+            </div>
+
+            <!-- 文字枠 (解答スロット) -->
+            <div id="answer-slots" class="flex gap-2 justify-center items-center my-1 flex-wrap">
+                <!-- スロットがJSで動的に生成されます -->
+            </div>
+        </div>
+
+        <!-- クレーンゲーム・ステージ (キャッチャーと文字カード) -->
+        <div id="game-stage" class="w-full h-56 sm:h-64 bg-gradient-to-b from-sky-100 to-indigo-50 rounded-2xl relative border-2 border-sky-200 overflow-hidden my-3 shadow-inner">
+            
+            <!-- 天井レール -->
+            <div class="absolute top-0 left-0 w-full h-4 bg-slate-300 border-b border-slate-400 flex items-center">
+                <div class="w-full h-1 bg-slate-500"></div>
+            </div>
+
+            <!-- クレーンアセンブリ -->
+            <div id="crane-assembly" class="absolute top-0 flex flex-col items-center z-20 pointer-events-none" style="left: 50%; transform: translateX(-50%);">
+                <!-- 台車 -->
+                <div class="w-10 h-4 bg-red-500 rounded-b-md shadow border border-red-700"></div>
+                <!-- ケーブル -->
+                <div id="crane-cable" class="crane-cable h-6"></div>
+                <!-- 爪ヘッド -->
+                <div id="crane-claw" class="crane-claw claw-open relative -mt-1">
+                    <svg width="48" height="32" viewBox="0 0 48 32" class="drop-shadow">
+                        <!-- 左のアーム -->
+                        <path class="claw-left origin-top-right transition-transform duration-200" d="M18,4 Q10,16 6,28 Q12,30 18,24" fill="#E53E3E" stroke="#9B2C2C" stroke-width="2"/>
+                        <!-- 右のアーム -->
+                        <path class="claw-right origin-top-left transition-transform duration-200" d="M30,4 Q38,16 42,28 Q36,30 30,24" fill="#E53E3E" stroke="#9B2C2C" stroke-width="2"/>
+                        <!-- 中央ジョイント -->
+                        <circle cx="24" cy="6" r="5" fill="#CBD5E0" stroke="#4A5568" stroke-width="2"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- カード配置エリア -->
+            <div id="cards-container" class="absolute bottom-2 left-0 w-full h-24 flex flex-wrap justify-around items-end px-3">
+                <!-- カードがJSで配置されます -->
+            </div>
+        </div>
+
+        <!-- コントローラー・操作エリア -->
+        <div class="w-full bg-pink-100/80 rounded-2xl p-2 sm:p-3 border-2 border-pink-200 flex flex-col items-center gap-2">
+            <div id="instruction-text" class="text-xs sm:text-sm text-pink-700 font-bold text-center">ボタンを おして クレーンを うごかそう！</div>
+            
+            <div class="flex justify-center items-center gap-3 w-full max-w-xs">
+                <!-- 左移動ボタン -->
+                <button id="btn-left" class="flex-1 bg-amber-400 active:bg-amber-600 text-white font-bold py-3 rounded-2xl shadow-lg transform active:scale-95 transition flex flex-col items-center justify-center border-b-4 border-amber-600 select-none">
+                    <span class="text-2xl mb-1">⬅️</span>
+                    <span class="text-xs font-black">ひだり</span>
+                </button>
+
+                <!-- キャッチ・落下ボタン -->
+                <button id="btn-drop" class="flex-1 bg-red-500 active:bg-red-700 text-white font-bold py-3 rounded-2xl shadow-lg transform active:scale-95 transition flex flex-col items-center justify-center border-b-4 border-red-700 select-none">
+                    <span class="text-2xl mb-1">🎯</span>
+                    <span class="text-xs font-black">つかむ</span>
+                </button>
+
+                <!-- 右移動ボタン -->
+                <button id="btn-right" class="flex-1 bg-amber-400 active:bg-amber-600 text-white font-bold py-3 rounded-2xl shadow-lg transform active:scale-95 transition flex flex-col items-center justify-center border-b-4 border-amber-600 select-none">
+                    <span class="text-2xl mb-1">➡️</span>
+                    <span class="text-xs font-black">みぎ</span>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- フル画面モーダル (正解・メッセージ用) -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-white rounded-3xl p-6 max-w-xs w-full text-center shadow-2xl border-4 border-yellow-300 transform scale-90 transition-transform duration-300" id="modal-content">
+            <div id="modal-emoji" class="text-6xl mb-2 animate-bounce">🎉</div>
+            <h2 id="modal-title" class="text-2xl font-black text-pink-600 mb-2">せいかい！</h2>
+            <p id="modal-message" class="text-gray-600 font-bold mb-4">すごーい！よくできたね！</p>
+            <button id="modal-next-btn" class="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-lg py-3 rounded-full shadow-lg hover:from-pink-600 hover:to-rose-600 transform active:scale-95 transition">
+                つぎの もんだいへ
+            </button>
+        </div>
+    </div>
+
+    <!-- フッター -->
+    <footer class="mt-2 text-center text-xs text-pink-700 font-bold">
+        カードをつかんで 問題をかんせいさせてね！
+    </footer>
+
+    <!-- JavaScript ロジック -->
+    <script>
+        // ユーティリティ: Sleep関数
+        const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        // ユーティリティ: 配列のシャッフル (フィッシャー–イェーツ)
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        /* --- サウンド効果音合成（Web Audio API） --- */
+        class SoundEffects {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        this.ctx = new AudioCtx();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playMove() {
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.08);
+                    gain.gain.setValueAtTime(0.05, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.08);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.08);
+                } catch(e) {}
+            }
+
+            playCatch() {
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.15);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.15);
+                } catch(e) {}
+            }
+
+            playSuccess() {
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                    notes.forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.15, this.ctx.currentTime + idx * 0.1);
+                        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + idx * 0.1 + 0.3);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(this.ctx.currentTime + idx * 0.1);
+                        osc.stop(this.ctx.currentTime + idx * 0.1 + 0.3);
+                    });
+                } catch(e) {}
+            }
+
+            playWrong() {
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+                    osc.frequency.setValueAtTime(150, this.ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.3);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.3);
+                } catch(e) {}
+            }
+        }
+
+        const sound = new SoundEffects();
+
+        /* --- ひらがな・カタカナ変換機能 --- */
+        function hiraToKata(str) {
+            return str.replace(/[\u3041-\u3096]/g, match => String.fromCharCode(match.charCodeAt(0) + 0x60));
+        }
+
+        /* --- 問題データ (イラスト問題) --- */
+        const PICTURE_PROBLEMS = [
+            {
+                name: "りんご",
+                english: "APPLE",
+                dummies: ["み", "ご", "め"],
+                englishDummies: ["B", "R", "S"],
+                svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+                    <path d="M50 25 C40 10, 20 10, 15 25 C10 40, 20 75, 45 85 C48 86, 52 86, 55 85 C80 75, 90 40, 85 25 C80 10, 60 10, 50 25 Z" fill="#ef4444" stroke="#dc2626" stroke-width="3"/>
+                    <path d="M50 25 Q55 15 60 10" fill="none" stroke="#78350f" stroke-width="4" stroke-linecap="round"/>
+                    <path d="M55 15 Q70 10 75 20 Q60 25 55 15 Z" fill="#22c55e"/>
+                    <ellipse cx="35" cy="35" rx="5" ry="12" fill="#ffffff" opacity="0.4" transform="rotate(-20 35 35)"/>
+                </svg>`
+            },
+            {
+                name: "ねこ",
+                english: "CAT",
+                dummies: ["い", "く", "と"],
+                englishDummies: ["D", "O", "G"],
+                svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+                    <ellipse cx="50" cy="55" rx="35" ry="30" fill="#f97316"/>
+                    <polygon points="20,35 10,10 35,25" fill="#f97316"/>
+                    <polygon points="22,32 15,15 32,25" fill="#fbcfe8"/>
+                    <polygon points="80,35 90,10 65,25" fill="#f97316"/>
+                    <polygon points="78,32 85,15 68,25" fill="#fbcfe8"/>
+                    <circle cx="35" cy="50" r="5" fill="#1e293b"/>
+                    <circle cx="65" cy="50" r="5" fill="#1e293b"/>
+                    <polygon points="50,58 45,54 55,54" fill="#f43f5e"/>
+                    <path d="M40 65 Q50 72 60 65" fill="none" stroke="#1e293b" stroke-width="3" stroke-linecap="round"/>
+                </svg>`
+            },
+            {
+                name: "ひこうき",
+                english: "PLANE",
+                dummies: ["ふ", "て", "も"],
+                englishDummies: ["S", "H", "I"],
+                svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+                    <path d="M10 50 C10 40 40 42 90 48 C95 50 95 52 90 54 C40 60 10 60 10 50 Z" fill="#e2e8f0"/>
+                    <path d="M40 48 L20 15 L35 15 L60 48 Z" fill="#3b82f6"/>
+                    <path d="M40 52 L20 85 L35 85 L60 52 Z" fill="#1d4ed8"/>
+                    <path d="M15 50 L5 30 L12 30 L22 50 Z" fill="#3b82f6"/>
+                </svg>`
+            },
+            {
+                name: "くるま",
+                english: "CAR",
+                dummies: ["ひ", "ば", "ん"],
+                englishDummies: ["B", "U", "S"],
+                svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+                    <path d="M15 55 L25 30 L70 30 L85 55 Z" fill="#3b82f6"/>
+                    <rect x="10" y="50" width="80" height="22" rx="6" fill="#2563eb"/>
+                    <circle cx="30" cy="72" r="12" fill="#334155"/>
+                    <circle cx="70" cy="72" r="12" fill="#334155"/>
+                </svg>`
+            },
+            {
+                name: "バナナ",
+                english: "BANANA",
+                dummies: ["メ", "ロ", "ン"],
+                englishDummies: ["P", "E", "R"],
+                isKatakanaNative: true,
+                svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+                    <path d="M25 20 C45 20 75 40 70 80 C60 75 35 50 20 25 C18 22 20 20 25 20 Z" fill="#facc15" stroke="#eab308" stroke-width="3"/>
+                    <path d="M25 20 C40 30 65 50 62 78" fill="none" stroke="#ca8a04" stroke-width="2"/>
+                    <rect x="22" y="15" width="6" height="8" rx="2" fill="#713f12"/>
+                </svg>`
+            }
+        ];
+
+        /* --- 図形問題データ --- */
+        const SHAPE_PROBLEMS = [
+            {
+                name: "まる",
+                dummies: ["さ", "ん", "し"],
+                svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+                    <circle cx="50" cy="50" r="35" fill="#f43f5e" stroke="#be123c" stroke-width="4"/>
+                </svg>`
+            },
+            {
+                name: "さんかく",
+                dummies: ["ま", "つ", "か"],
+                svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+                    <polygon points="50,15 15,80 85,80" fill="#06b6d4" stroke="#0891b2" stroke-width="4"/>
+                </svg>`
+            },
+            {
+                name: "しかく",
+                dummies: ["る", "く", "つ"],
+                svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+                    <rect x="20" y="20" width="60" height="60" rx="4" fill="#10b981" stroke="#047857" stroke-width="4"/>
+                </svg>`
+            },
+            {
+                name: "つつ",
+                dummies: ["ま", "り", "く"],
+                svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+                    <path d="M25 25 L25 75 A25 10 0 0 0 75 75 L75 25 A25 10 0 0 0 25 25 Z" fill="#8b5cf6" stroke="#6d28d9" stroke-width="3"/>
+                    <ellipse cx="50" cy="25" rx="25" ry="10" fill="#a78bfa" stroke="#6d28d9" stroke-width="3"/>
+                </svg>`
+            },
+            {
+                name: "ほし",
+                dummies: ["は", "な", "き"],
+                svg: `<svg viewBox="0 0 100 100" class="w-full h-full">
+                    <polygon points="50,10 61,35 88,35 66,52 75,78 50,62 25,78 34,52 12,35 39,35" fill="#f59e0b" stroke="#d97706" stroke-width="3"/>
+                </svg>`
+            }
+        ];
+
+        /* --- 計算問題データ --- */
+        const MATH_PROBLEMS = [
+            { question: "3 + 2 = ?", answer: "5", dummies: ["4", "6", "8"] },
+            { question: "7 + 4 = ?", answer: "11", dummies: ["10", "12", "13"] },
+            { question: "9 - 4 = ?", answer: "5", dummies: ["3", "4", "6"] },
+            { question: "15 - 7 = ?", answer: "8", dummies: ["6", "7", "9"] },
+            { question: "6 + 6 = ?", answer: "12", dummies: ["10", "11", "14"] }
+        ];
+
+        /* --- 漢字問題データ（読み方＆漢字選び） --- */
+        const KANJI_PROBLEMS = [
+            { kanji: "犬", reading: "いぬ", dummiesReading: ["ねこ", "くま", "とり"], dummiesKanji: ["猫", "熊", "鳥"] },
+            { kanji: "山", reading: "やま", dummiesReading: ["川", "海", "空"], dummiesKanji: ["川", "海", "空"] },
+            { kanji: "車", reading: "くるま", dummiesReading: ["でんしゃ", "ふね", "ひこうき"], dummiesKanji: ["電", "船", "飛"] },
+            { kanji: "月", reading: "つき", dummiesReading: ["ほし", "たいよう", "すいせい"], dummiesKanji: ["星", "日", "水"] },
+            { kanji: "雨", reading: "あめ", dummiesReading: ["ゆき", "かぜ", "くもり"], dummiesKanji: ["雪", "風", "雲"] }
+        ];
+
+        /* --- ゲーム状態管理 --- */
+        let currentProblemIndex = 0;
+        let score = 0;
+        let gameMode = 'hiragana'; // 'hiragana', 'katakana', 'english', 'shape', 'math', 'kanji-read', 'kanji-write'
+        let currentAnswer = [];
+        let craneXPercent = 50;
+        let craneCableHeight = 24;
+        let isBusy = false;
+
+        // DOM要素参照
+        const imageContainer = document.getElementById('image-container');
+        const answerSlotsContainer = document.getElementById('answer-slots');
+        const cardsContainer = document.getElementById('cards-container');
+        const craneAssembly = document.getElementById('crane-assembly');
+        const craneCable = document.getElementById('crane-cable');
+        const craneClaw = document.getElementById('crane-claw');
+        const scoreDisplay = document.getElementById('score-display');
+        const instructionText = document.getElementById('instruction-text');
+
+        const btnModeHiragana = document.getElementById('mode-hiragana');
+        const btnModeKatakana = document.getElementById('mode-katakana');
+        const btnModeEnglish = document.getElementById('mode-english');
+        const btnModeShape = document.getElementById('mode-shape');
+        const btnModeMath = document.getElementById('mode-math');
+        const btnModeKanjiRead = document.getElementById('mode-kanji-read');
+        const btnModeKanjiWrite = document.getElementById('mode-kanji-write');
+
+        const btnLeft = document.getElementById('btn-left');
+        const btnRight = document.getElementById('btn-right');
+        const btnDrop = document.getElementById('btn-drop');
+
+        const modalOverlay = document.getElementById('modal-overlay');
+        const modalContent = document.getElementById('modal-content');
+        const modalNextBtn = document.getElementById('modal-next-btn');
+
+        /* --- 初期化 --- */
+        window.onload = () => {
+            initGame();
+        };
+
+        function initGame() {
+            currentProblemIndex = 0;
+            score = 0;
+            scoreDisplay.textContent = score;
+            loadProblem(currentProblemIndex);
+            setupEventListeners();
+        }
+
+        /* --- クレーン操作・位置の更新 --- */
+        function updateCranePosition() {
+            craneAssembly.style.left = `${craneXPercent}%`;
+            craneCable.style.height = `${craneCableHeight}px`;
+        }
+
+        function setClawOpen(isOpen) {
+            if (isOpen) {
+                craneClaw.classList.remove('claw-closed');
+                craneClaw.classList.add('claw-open');
+            } else {
+                craneClaw.classList.remove('claw-open');
+                craneClaw.classList.add('claw-closed');
+            }
+        }
+
+        function moveCrane(deltaX) {
+            if (isBusy) return;
+            craneXPercent = Math.max(10, Math.min(90, craneXPercent + deltaX));
+            updateCranePosition();
+        }
+
+        async function executeGrabSequence() {
+            if (isBusy) return;
+            isBusy = true;
+
+            // クレーンを下げる
+            setClawOpen(true);
+            const initialHeight = craneCableHeight;
+            const targetHeight = 150; // キャッチ位置まで伸長
+
+            for (let h = initialHeight; h <= targetHeight; h += 5) {
+                craneCableHeight = h;
+                updateCranePosition();
+                await sleep(15);
+            }
+
+            setClawOpen(false);
+            sound.playCatch();
+            await sleep(200);
+
+            // 一番近いカードを検知して掴む
+            const cards = Array.from(cardsContainer.children);
+            const clawRect = craneClaw.getBoundingClientRect();
+            const clawCenterX = clawRect.left + clawRect.width / 2;
+
+            let grabbedCard = null;
+            let minDistance = Infinity;
+
+            cards.forEach(card => {
+                const cardRect = card.getBoundingClientRect();
+                const cardCenterX = cardRect.left + cardRect.width / 2;
+                const dist = Math.abs(cardCenterX - clawCenterX);
+                if (dist < 45 && dist < minDistance) {
+                    minDistance = dist;
+                    grabbedCard = card;
+                }
+            });
+
+            if (grabbedCard) {
+                // カードを爪にアタッチ
+                grabbedCard.style.transition = 'none';
+                craneClaw.appendChild(grabbedCard);
+                grabbedCard.style.position = 'absolute';
+                grabbedCard.style.top = '20px';
+                grabbedCard.style.left = '50%';
+                grabbedCard.style.transform = 'translateX(-50%)';
+            }
+
+            // クレーンを上げる
+            for (let h = targetHeight; h >= initialHeight; h -= 5) {
+                craneCableHeight = h;
+                updateCranePosition();
+                await sleep(15);
+            }
+
+            // カードを掴めた場合、空いている最初のスロットに格納
+            if (grabbedCard) {
+                const emptySlotIndex = currentAnswer.findIndex(val => val === '');
+                if (emptySlotIndex !== -1) {
+                    const char = grabbedCard.dataset.char;
+                    currentAnswer[emptySlotIndex] = char;
+
+                    const slots = answerSlotsContainer.children;
+                    const targetSlot = slots[emptySlotIndex];
+
+                    grabbedCard.remove();
+                    targetSlot.textContent = char;
+                    targetSlot.classList.add('bg-pink-100', 'border-pink-500');
+                } else {
+                    // 空きスロットがない場合はカードを戻す
+                    cardsContainer.appendChild(grabbedCard);
+                    grabbedCard.style.position = 'static';
+                    grabbedCard.style.transform = 'none';
+                }
+            }
+
+            setClawOpen(true);
+            isBusy = false;
+
+            // 回答判定
+            checkAnswer();
+        }
+
+        function setGameMode(mode) {
+            if (gameMode === mode) return;
+            gameMode = mode;
+
+            const inactiveClass = "px-2 sm:px-3 py-1 rounded-xl text-xs font-bold transition-all text-pink-700 hover:text-pink-900";
+            const activeClass = "px-2 sm:px-3 py-1 rounded-xl text-xs font-bold transition-all bg-pink-500 text-white shadow";
+
+            [btnModeHiragana, btnModeKatakana, btnModeEnglish, btnModeShape, btnModeMath, btnModeKanjiRead, btnModeKanjiWrite].forEach(btn => {
+                btn.className = inactiveClass;
+            });
+
+            if (gameMode === 'hiragana') {
+                btnModeHiragana.className = activeClass;
+                instructionText.textContent = "ボタンを おして ひらがなを つかもう！";
+            } else if (gameMode === 'katakana') {
+                btnModeKatakana.className = activeClass;
+                instructionText.textContent = "ボタンを オシテ カタカナヲ ツカモウ！";
+            } else if (gameMode === 'english') {
+                btnModeEnglish.className = activeClass;
+                instructionText.textContent = "ボタンを押して えいご（ABC）をつかもう！";
+            } else if (gameMode === 'shape') {
+                btnModeShape.className = activeClass;
+                instructionText.textContent = "かたちの なまえの ひらがなをつかもう！";
+            } else if (gameMode === 'math') {
+                btnModeMath.className = activeClass;
+                instructionText.textContent = "けいさんの こたえの すうじをつかもう！";
+            } else if (gameMode === 'kanji-read') {
+                btnModeKanjiRead.className = activeClass;
+                instructionText.textContent = "かんじの よみかた（ひらがな）をつかもう！";
+            } else if (gameMode === 'kanji-write') {
+                btnModeKanjiWrite.className = activeClass;
+                instructionText.textContent = "よみにあう 正しい「かんじ」をつかもう！";
+            }
+
+            currentProblemIndex = 0;
+            loadProblem(currentProblemIndex);
+        }
+
+        function loadProblem(index) {
+            isBusy = false;
+            let targetAnswer = "";
+            let options = [];
+
+            if (['hiragana', 'katakana', 'english'].includes(gameMode)) {
+                const rawProblem = PICTURE_PROBLEMS[index % PICTURE_PROBLEMS.length];
+                imageContainer.innerHTML = rawProblem.svg;
+
+                let name = rawProblem.name;
+                let dummies = [...rawProblem.dummies];
+
+                if (gameMode === 'english') {
+                    name = rawProblem.english;
+                    dummies = [...rawProblem.englishDummies];
+                } else if (gameMode === 'katakana') {
+                    name = hiraToKata(name);
+                    dummies = dummies.map(d => hiraToKata(d));
+                } else if (rawProblem.isKatakanaNative) {
+                    name = name.replace(/[\u30a1-\u30f6]/g, m => String.fromCharCode(m.charCodeAt(0) - 0x60));
+                    dummies = dummies.map(d => d.replace(/[\u30a1-\u30f6]/g, m => String.fromCharCode(m.charCodeAt(0) - 0x60)));
+                }
+
+                targetAnswer = name;
+                options = [...name.split(''), ...dummies];
+            } 
+            else if (gameMode === 'shape') {
+                const rawProblem = SHAPE_PROBLEMS[index % SHAPE_PROBLEMS.length];
+                imageContainer.innerHTML = rawProblem.svg;
+                targetAnswer = rawProblem.name;
+                options = [...rawProblem.name.split(''), ...rawProblem.dummies];
+            }
+            else if (gameMode === 'math') {
+                const problem = MATH_PROBLEMS[index % MATH_PROBLEMS.length];
+                imageContainer.innerHTML = `<div class="text-2xl sm:text-3xl font-black text-indigo-700">${problem.question}</div>`;
+                targetAnswer = problem.answer;
+                options = [problem.answer, ...problem.dummies];
+            } 
+            else if (gameMode === 'kanji-read') {
+                const problem = KANJI_PROBLEMS[index % KANJI_PROBLEMS.length];
+                imageContainer.innerHTML = `<div class="text-4xl sm:text-5xl font-black text-slate-800">${problem.kanji}</div>`;
+                targetAnswer = problem.reading;
+                options = [...problem.reading.split(''), ...problem.dummiesReading.join('').split('')];
+            } 
+            else if (gameMode === 'kanji-write') {
+                const problem = KANJI_PROBLEMS[index % KANJI_PROBLEMS.length];
+                imageContainer.innerHTML = `<div class="text-2xl sm:text-3xl font-black text-pink-600">${problem.reading}</div>`;
+                targetAnswer = problem.kanji;
+                options = [problem.kanji, ...problem.dummiesKanji];
+            }
+
+            currentAnswer = new Array(targetAnswer.length).fill('');
+
+            // 文字枠生成
+            answerSlotsContainer.innerHTML = '';
+            for (let i = 0; i < targetAnswer.length; i++) {
+                const slot = document.createElement('div');
+                const slotSizeClass = targetAnswer.length > 5 ? "w-8 h-8 sm:w-10 sm:h-10 text-lg" : "w-10 h-10 sm:w-12 sm:h-12 text-xl sm:text-2xl";
+                slot.className = `${slotSizeClass} border-2 border-dashed border-pink-400 bg-white rounded-xl flex items-center justify-center font-black text-pink-600 shadow-sm transition-all`;
+                slot.dataset.index = i;
+                answerSlotsContainer.appendChild(slot);
+            }
+
+            // カード作成と配置
+            shuffleArray(options);
+            cardsContainer.innerHTML = '';
+            options.forEach((char, idx) => {
+                const card = document.createElement('div');
+                card.className = "char-card px-2 min-w-[2.5rem] h-10 sm:h-12 bg-amber-300 border-2 border-amber-500 rounded-2xl flex items-center justify-center font-black text-lg sm:text-xl text-amber-900 cursor-pointer transform hover:scale-105 active:scale-95";
+                card.textContent = char;
+                card.dataset.char = char;
+                card.dataset.id = `card-${idx}`;
+                cardsContainer.appendChild(card);
+            });
+
+            // クレーン初期位置
+            craneXPercent = 50;
+            craneCableHeight = 24;
+            updateCranePosition();
+            setClawOpen(true);
+        }
+
+        /* --- イベント割り当て --- */
+        function setupEventListeners() {
+            btnModeHiragana.onclick = () => setGameMode('hiragana');
+            btnModeKatakana.onclick = () => setGameMode('katakana');
+            btnModeEnglish.onclick = () => setGameMode('english');
+            btnModeShape.onclick = () => setGameMode('shape');
+            btnModeMath.onclick = () => setGameMode('math');
+            btnModeKanjiRead.onclick = () => setGameMode('kanji-read');
+            btnModeKanjiWrite.onclick = () => setGameMode('kanji-write');
+
+            let moveInterval = null;
+
+            const startMove = (dir) => {
+                if (isBusy) return;
+                sound.playMove();
+                moveCrane(dir);
+                if (!moveInterval) {
+                    moveInterval = setInterval(() => moveCrane(dir), 50);
+                }
+            };
+
+            const stopMove = () => {
+                if (moveInterval) {
+                    clearInterval(moveInterval);
+                    moveInterval = null;
+                }
+            };
+
+            // ボタン操作（マウス＆タッチ）
+            btnLeft.onmousedown = () => startMove(-2);
+            btnLeft.onmouseup = stopMove;
+            btnLeft.onmouseleave = stopMove;
+            btnLeft.ontouchstart = (e) => { e.preventDefault(); startMove(-2); };
+            btnLeft.ontouchend = stopMove;
+
+            btnRight.onmousedown = () => startMove(2);
+            btnRight.onmouseup = stopMove;
+            btnRight.onmouseleave = stopMove;
+            btnRight.ontouchstart = (e) => { e.preventDefault(); startMove(2); };
+            btnRight.ontouchend = stopMove;
+
+            btnDrop.onclick = () => {
+                if (!isBusy) executeGrabSequence();
+            };
+
+            modalNextBtn.onclick = () => {
+                hideModal();
+                currentProblemIndex++;
+                loadProblem(currentProblemIndex);
+            };
+        }
+
+        /* --- 解答チェック --- */
+        function checkAnswer() {
+            let targetAnswer = "";
+
+            if (['hiragana', 'katakana', 'english'].includes(gameMode)) {
+                const rawProblem = PICTURE_PROBLEMS[currentProblemIndex % PICTURE_PROBLEMS.length];
+                targetAnswer = rawProblem.name;
+                if (gameMode === 'english') targetAnswer = rawProblem.english;
+                else if (gameMode === 'katakana') targetAnswer = hiraToKata(targetAnswer);
+                else if (rawProblem.isKatakanaNative) targetAnswer = targetAnswer.replace(/[\u30a1-\u30f6]/g, m => String.fromCharCode(m.charCodeAt(0) - 0x60));
+            } else if (gameMode === 'shape') {
+                targetAnswer = SHAPE_PROBLEMS[currentProblemIndex % SHAPE_PROBLEMS.length].name;
+            } else if (gameMode === 'math') {
+                targetAnswer = MATH_PROBLEMS[currentProblemIndex % MATH_PROBLEMS.length].answer;
+            } else if (gameMode === 'kanji-read') {
+                targetAnswer = KANJI_PROBLEMS[currentProblemIndex % KANJI_PROBLEMS.length].reading;
+            } else if (gameMode === 'kanji-write') {
+                targetAnswer = KANJI_PROBLEMS[currentProblemIndex % KANJI_PROBLEMS.length].kanji;
+            }
+
+            const isFull = currentAnswer.every(val => val !== '');
+
+            if (isFull) {
+                const userAnswerStr = currentAnswer.join('');
+                if (userAnswerStr === targetAnswer) {
+                    score += 10;
+                    scoreDisplay.textContent = score;
+                    sound.playSuccess();
+
+                    let msg = `「${targetAnswer}」 できたね！`;
+                    if (gameMode === 'math') msg = `せいかい！ こたえは ${targetAnswer}！`;
+
+                    setTimeout(() => {
+                        showModal("🎉 せいかい！", msg, "🥳");
+                    }, 300);
+                } else {
+                    sound.playWrong();
+                    setTimeout(() => {
+                        loadProblem(currentProblemIndex);
+                    }, 600);
+                }
+            }
+        }
+
+        /* --- モーダル制御 --- */
+        function showModal(title, msg, emoji = "🎉") {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = msg;
+            document.getElementById('modal-emoji').textContent = emoji;
+            modalOverlay.classList.remove('opacity-0', 'pointer-events-none');
+            modalContent.classList.remove('scale-90');
+            modalContent.classList.add('scale-100');
+        }
+
+        function hideModal() {
+            modalOverlay.classList.add('opacity-0', 'pointer-events-none');
+            modalContent.classList.remove('scale-100');
+            modalContent.classList.add('scale-90');
+        }
+    </script>
+</body>
+</html>
